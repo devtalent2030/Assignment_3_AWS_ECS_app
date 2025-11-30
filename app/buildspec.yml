@@ -1,0 +1,42 @@
+version: 0.2
+
+env:
+  variables:
+    AWS_REGION: "ca-central-1"
+    IMAGE_REPO_NAME: "assignment3-ecs-app"
+    IMAGE_TAG: "latest"
+    CONTAINER_NAME: "flask-app"  # must match ECS container name
+
+phases:
+  install:
+    commands:
+      - echo "Install phase - no extra tools required for now"
+  pre_build:
+    commands:
+      - echo "Pre-build phase - logging in to Amazon ECR"
+      - aws --version
+      - ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+      - echo "Using AWS account: $ACCOUNT_ID"
+      - aws ecr get-login-password --region $AWS_REGION \
+          | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+  build:
+    commands:
+      - echo "Build phase - building Docker image on $(date)"
+      # Build image using Dockerfile in app/ and app/ as context
+      - docker build -f app/Dockerfile -t $IMAGE_REPO_NAME:$IMAGE_TAG ./app
+      - echo "Tagging image for ECR"
+      - docker tag $IMAGE_REPO_NAME:$IMAGE_TAG \
+          $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG
+  post_build:
+    commands:
+      - echo "Post-build phase - pushing image to ECR"
+      - docker push $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG
+      - echo "Creating imagedefinitions.json for ECS deployment"
+      - IMAGE_URI="$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG"
+      - printf '[{"name":"%s","imageUri":"%s"}]' "$CONTAINER_NAME" "$IMAGE_URI" > imagedefinitions.json
+      - echo "imagedefinitions.json contents:"
+      - cat imagedefinitions.json
+
+artifacts:
+  files:
+    - imagedefinitions.json
