@@ -5,7 +5,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "Hello from Nyota ECS Container"
+    return "Hello from Ogunrinu ECS Container"
 
 if __name__ == "__main__":
     # Listen on 0.0.0.0 so Docker/ECS can reach it
